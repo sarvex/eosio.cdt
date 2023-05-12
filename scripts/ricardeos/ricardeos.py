@@ -143,22 +143,19 @@ def main():
             print('Please specify a source and destination abi:')
             print('Usage: ./ricardeos.py import /eos/contracts/contract/mycontract.abi /eos/contracts/contract/withricardian-mycontract.abi')
 
-            sys.exit(0)
         else:
             import_ricardian_to_abi(sys.argv[2], sys.argv[3])
 
-            sys.exit(0)
+        sys.exit(0)
     elif sys.argv[1] == 'export':
         if len(sys.argv) < 3:
             print('Please specify a source abi:')
             print('Usage: ./ricardeos.py export /eos/contracts/contract/mycontract.abi')
 
-            sys.exit(0)
         else:
             export_ricardian_from_abi(sys.argv[2])
 
-            sys.exit(0)
-        
+        sys.exit(0)
     else:
         print('Operation not recognized only import and export operations are supported')
 

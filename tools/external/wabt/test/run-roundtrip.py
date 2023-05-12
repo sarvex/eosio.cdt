@@ -47,10 +47,10 @@ def FilesAreEqual(filename1, filename2, verbose=False):
     if verbose:
       hexdump1 = utils.Hexdump(data1)
       hexdump2 = utils.Hexdump(data2)
-      diff_lines = []
-      for line in (difflib.unified_diff(hexdump1, hexdump2, fromfile=filename1,
-                                        tofile=filename2)):
-        diff_lines.append(line)
+      diff_lines = list((difflib.unified_diff(hexdump1,
+                                              hexdump2,
+                                              fromfile=filename1,
+                                              tofile=filename2)))
       msg += ''.join(diff_lines)
     msg += '\n'
     return (ERROR, msg)
@@ -60,9 +60,9 @@ def FilesAreEqual(filename1, filename2, verbose=False):
 def TwoRoundtrips(wat2wasm, wasm2wat, out_dir, filename, verbose):
   basename = os.path.basename(filename)
   basename_noext = os.path.splitext(basename)[0]
-  wasm1_file = os.path.join(out_dir, basename_noext + '-1.wasm')
-  wast2_file = os.path.join(out_dir, basename_noext + '-2.wast')
-  wasm3_file = os.path.join(out_dir, basename_noext + '-3.wasm')
+  wasm1_file = os.path.join(out_dir, f'{basename_noext}-1.wasm')
+  wast2_file = os.path.join(out_dir, f'{basename_noext}-2.wast')
+  wasm3_file = os.path.join(out_dir, f'{basename_noext}-3.wasm')
   try:
     wat2wasm.RunWithArgs('-o', wasm1_file, filename)
   except Error as e:
@@ -80,7 +80,7 @@ def TwoRoundtrips(wat2wasm, wasm2wat, out_dir, filename, verbose):
 def OneRoundtripToStdout(wat2wasm, wasm2wat, out_dir, filename, verbose):
   basename = os.path.basename(filename)
   basename_noext = os.path.splitext(basename)[0]
-  wasm_file = os.path.join(out_dir, basename_noext + '.wasm')
+  wasm_file = os.path.join(out_dir, f'{basename_noext}.wasm')
   try:
     wat2wasm.RunWithArgs('-o', wasm_file, filename)
   except Error as e:

@@ -71,7 +71,7 @@ def ProcessFile(nm, file_):
     if type_ != 'T':
       continue
     name = line[11:]
-    names.append('_' + name)
+    names.append(f'_{name}')
   return names
 
 

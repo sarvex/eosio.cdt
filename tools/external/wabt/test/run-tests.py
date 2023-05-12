@@ -171,9 +171,7 @@ class Cell(object):
 
 
 def SplitArgs(value):
-  if isinstance(value, list):
-    return value
-  return shlex.split(value)
+  return value if isinstance(value, list) else shlex.split(value)
 
 
 def FixPythonExecutable(args):
@@ -296,8 +294,7 @@ class RunResult(object):
     return self.returncode != self.GetExpectedReturncode()
 
   def __repr__(self):
-    return 'RunResult(%s, %s, %s, %s, %s)' % (
-        self.cmd, self.stdout, self.stderr, self.returncode, self.duration)
+    return f'RunResult({self.cmd}, {self.stdout}, {self.stderr}, {self.returncode}, {self.duration})'
 
 
 class TestResult(object):
@@ -379,10 +376,7 @@ class TestInfo(object):
   def GetName(self):
     name = self.filename
     if self.is_roundtrip:
-      if self.fold_exprs:
-        name += ' (roundtrip fold-exprs)'
-      else:
-        name += ' (roundtrip)'
+      name += ' (roundtrip fold-exprs)' if self.fold_exprs else ' (roundtrip)'
     return name
 
   def GetGeneratedInputFilename(self):
@@ -411,7 +405,7 @@ class TestInfo(object):
 
   def SetTool(self, tool):
     if tool not in TOOLS:
-      raise Error('Unknown tool: %s' % tool)
+      raise Error(f'Unknown tool: {tool}')
     self.tool = tool
     for tool_key, tool_value in TOOLS[tool]:
       self.ParseDirective(tool_key, tool_value)
@@ -420,7 +414,7 @@ class TestInfo(object):
     try:
       return self.cmds[index]
     except IndexError:
-      raise Error('Invalid command index: %s' % index)
+      raise Error(f'Invalid command index: {index}')
 
   def GetLastCommand(self):
     return self.GetCommand(len(self.cmds) - 1)
@@ -434,7 +428,7 @@ class TestInfo(object):
       for cmd in self.cmds:
         fn(cmd)
     else:
-      raise Error('Invalid directive suffix: %s' % suffix)
+      raise Error(f'Invalid directive suffix: {suffix}')
 
   def ParseDirective(self, key, value):
     if key == 'RUN':
@@ -462,7 +456,7 @@ class TestInfo(object):
       # Pattern: FOO=1 BAR=stuff
       self.env = dict(x.split('=') for x in value.split())
     else:
-      raise Error('Unknown directive: %s' % key)
+      raise Error(f'Unknown directive: {key}')
 
   def Parse(self, filename):
     self.filename = filename
@@ -475,35 +469,32 @@ class TestInfo(object):
       input_lines = []
       stdout_lines = []
       stderr_lines = []
-      for line in f.readlines():
+      for line in f:
         empty = False
-        m = re.match(r'\s*\(;; (STDOUT|STDERR) ;;;$', line)
-        if m:
-          directive = m.group(1)
+        if m := re.match(r'\s*\(;; (STDOUT|STDERR) ;;;$', line):
+          directive = m[1]
           if directive == 'STDERR':
             state = 'stderr'
             continue
           elif directive == 'STDOUT':
             state = 'stdout'
             continue
-        else:
-          m = re.match(r'\s*;;;(.*)$', line)
-          if m:
-            directive = m.group(1).strip()
-            if state == 'header':
-              key, value = directive.split(':', 1)
-              key = key.strip()
-              value = value.strip()
-              self.ParseDirective(key, value)
-            elif state in ('stdout', 'stderr'):
-              if not re.match(r'%s ;;\)$' % state.upper(), directive):
-                raise Error('Bad directive in %s block: %s' % (state,
-                                                               directive))
+        elif m := re.match(r'\s*;;;(.*)$', line):
+          directive = m[1].strip()
+          if state == 'header':
+            key, value = directive.split(':', 1)
+            key = key.strip()
+            value = value.strip()
+            self.ParseDirective(key, value)
+          elif state in ('stdout', 'stderr'):
+            if re.match(r'%s ;;\)$' % state.upper(), directive):
               state = 'none'
             else:
-              raise Error('Unexpected directive: %s' % directive)
-          elif state == 'header':
-            state = 'input'
+              raise Error(f'Bad directive in {state} block: {directive}')
+          else:
+            raise Error(f'Unexpected directive: {directive}')
+        elif state == 'header':
+          state = 'input'
 
         if state == 'header':
           header_lines.append(line)
@@ -672,7 +663,7 @@ def RunTest(info, options, variables, verbose_level=0):
 
   cwd = REPO_ROOT_DIR
   env = dict(os.environ)
-  env.update(info.env)
+  env |= info.env
   gen_input_path = info.CreateInputFile()
   rel_gen_input_path = (
       os.path.relpath(gen_input_path, cwd).replace(os.path.sep, '/'))
@@ -726,23 +717,22 @@ def HandleTestResult(status, info, result, rebase=False):
           raise Error(result.stderr)
       else:
         status.Passed(info, result.duration)
+    elif result.Failed():
+      # This test has already failed, but diff it anyway.
+      last_failure = result.GetLastFailure()
+      msg = 'expected error code %d, got %d.' % (
+          last_failure.GetExpectedReturncode(), last_failure.returncode)
+      try:
+        info.Diff(result.stdout, result.stderr)
+      except Error as e:
+        msg += '\n' + str(e)
+      raise Error(msg)
     else:
-      if result.Failed():
-        # This test has already failed, but diff it anyway.
-        last_failure = result.GetLastFailure()
-        msg = 'expected error code %d, got %d.' % (
-            last_failure.GetExpectedReturncode(), last_failure.returncode)
-        try:
-          info.Diff(result.stdout, result.stderr)
-        except Error as e:
-          msg += '\n' + str(e)
-        raise Error(msg)
+      if rebase:
+        info.Rebase(result.stdout, result.stderr)
       else:
-        if rebase:
-          info.Rebase(result.stdout, result.stderr)
-        else:
-          info.Diff(result.stdout, result.stderr)
-        status.Passed(info, result.duration)
+        info.Diff(result.stdout, result.stderr)
+      status.Passed(info, result.duration)
   except Error as e:
     status.Failed(info, str(e), result)
 
@@ -811,9 +801,8 @@ def RunSingleThreaded(infos_to_run, status, options, variables):
       if options.fail_fast:
         break
       elif options.stop_interactive:
-        rerun_verbose = YesNoPrompt(question='Rerun with verbose option?',
-                                    default='no')
-        if rerun_verbose:
+        if rerun_verbose := YesNoPrompt(question='Rerun with verbose option?',
+                                        default='no'):
           RunTest(info, options, variables, verbose_level=2)
         should_continue = YesNoPrompt(question='Continue testing?',
                                       default='yes')
@@ -826,10 +815,7 @@ def RunSingleThreaded(infos_to_run, status, options, variables):
 
 def GetDefaultJobCount():
   cpu_count = multiprocessing.cpu_count()
-  if cpu_count <= 1:
-    return 1
-  else:
-    return cpu_count // 2
+  return 1 if cpu_count <= 1 else cpu_count // 2
 
 
 def main(args):
@@ -874,8 +860,7 @@ def main(args):
       parser.error('--stop-interactive only works with -j1')
 
   if options.patterns:
-    pattern_re = '|'.join(
-        fnmatch.translate('*%s*' % p) for p in options.patterns)
+    pattern_re = '|'.join(fnmatch.translate(f'*{p}*') for p in options.patterns)
   else:
     pattern_re = '.*'
 
@@ -889,8 +874,7 @@ def main(args):
     print('no tests match that filter')
     return 1
 
-  variables = {}
-  variables['test_dir'] = os.path.abspath(TEST_DIR)
+  variables = {'test_dir': os.path.abspath(TEST_DIR)}
   variables['bindir'] = options.bindir
   variables['gen_wasm_py'] = find_exe.GEN_WASM_PY
   variables['gen_spec_js_py'] = find_exe.GEN_SPEC_JS_PY

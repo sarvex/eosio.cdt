@@ -46,18 +46,19 @@ def main(args):
   spec_tests = set(GetFilesWithExtension(SPEC_TEST_DIR, '.txt'))
 
   for removed_test_name in spec_tests - testsuite_tests:
-    test_filename = os.path.join(SPEC_TEST_DIR, removed_test_name + '.txt')
+    test_filename = os.path.join(SPEC_TEST_DIR, f'{removed_test_name}.txt')
     if options.verbose:
-      print('Removing %s' % test_filename)
+      print(f'Removing {test_filename}')
     os.remove(test_filename)
 
   for added_test_name in testsuite_tests - spec_tests:
     wast_filename = os.path.join(
         os.path.relpath(TESTSUITE_DIR, REPO_ROOT_DIR),
-        added_test_name + '.wast')
-    test_filename = os.path.join(SPEC_TEST_DIR, added_test_name + '.txt')
+        f'{added_test_name}.wast',
+    )
+    test_filename = os.path.join(SPEC_TEST_DIR, f'{added_test_name}.txt')
     if options.verbose:
-      print('Adding %s' % test_filename)
+      print(f'Adding {test_filename}')
     with open(test_filename, 'w') as f:
       if added_test_name.endswith('.fail'):
         f.write(';;; ERROR: 1\n')

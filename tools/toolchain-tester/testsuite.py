@@ -44,9 +44,10 @@ class TestSuite:
             file_name = abs_f.split("/")[-1]
             name = file_name.split(".")[0]
 
-            if ".cpp" in file_name:
-                if not os.path.isfile(os.path.join(self.directory, f"{name}.json")):
-                    raise MissingJsonError(f"{file_name} is missing the test json file")
+            if ".cpp" in file_name and not os.path.isfile(
+                os.path.join(self.directory, f"{name}.json")
+            ):
+                raise MissingJsonError(f"{file_name} is missing the test json file")
 
             if ".json" in file_name:
                 if not os.path.isfile(os.path.join(self.directory, f"{name}.cpp")):

@@ -27,8 +27,11 @@ import tempfile
 
 # Get signal names from numbers in Python
 # http://stackoverflow.com/a/2549950
-SIGNAMES = dict((k, v) for v, k in reversed(sorted(signal.__dict__.items()))
-                if v.startswith('SIG') and not v.startswith('SIG_'))
+SIGNAMES = {
+    k: v
+    for v, k in reversed(sorted(signal.__dict__.items()))
+    if v.startswith('SIG') and not v.startswith('SIG_')
+}
 
 
 class Error(Exception):
@@ -87,7 +90,7 @@ class Executable(object):
       elif process.returncode > 0:
         error = Error('Error running "%s":\n%s' % (err_cmd_str, stderr))
     except OSError as e:
-      error = Error('Error running "%s": %s' % (err_cmd_str, str(e)))
+      error = Error(f'Error running "{err_cmd_str}": {str(e)}')
     return stdout, stderr, error
 
   def RunWithArgsForStdout(self, *args, **kwargs):
@@ -112,7 +115,7 @@ class Executable(object):
         if value is True:
           self.AppendArg(option)
         else:
-          self.AppendArg('%s=%s' % (option, value))
+          self.AppendArg(f'{option}={value}')
 
 
 @contextlib.contextmanager
@@ -155,23 +158,17 @@ def Hexdump(data):
     line_end = p + DUMP_OCTETS_PER_LINE
     line = '%07x: ' % p
     while p < line_end:
-      for i in xrange(DUMP_OCTETS_PER_GROUP):
-        if p < end:
-          line += '%02x' % data[p]
-        else:
-          line += '  '
+      for _ in xrange(DUMP_OCTETS_PER_GROUP):
+        line += '%02x' % data[p] if p < end else '  '
         p += 1
       line += ' '
     line += ' '
     p = line_start
-    for i in xrange(DUMP_OCTETS_PER_LINE):
+    for _ in xrange(DUMP_OCTETS_PER_LINE):
       if p >= end:
         break
       x = data[p]
-      if x >= 32 and x < 0x7f:
-        line += '%c' % x
-      else:
-        line += '.'
+      line += '%c' % x if x >= 32 and x < 0x7f else '.'
       p += 1
     line += '\n'
     lines.append(line)

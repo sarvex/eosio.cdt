@@ -42,23 +42,23 @@ def ReinterpretF32(f32_bits):
 def F32ToC(f32_bits):
   F32_SIGN_BIT = 0x80000000
   F32_INF = 0x7f800000
-  F32_SIG_MASK = 0x7fffff
-
   if (f32_bits & F32_INF) == F32_INF:
     sign = '-' if (f32_bits & F32_SIGN_BIT) == F32_SIGN_BIT else ''
+    F32_SIG_MASK = 0x7fffff
+
     # NaN or infinity
     if f32_bits & F32_SIG_MASK:
       # NaN
       return '%smake_nan_f32(0x%06x)' % (sign, f32_bits & F32_SIG_MASK)
     else:
-      return '%sINFINITY' % sign
+      return f'{sign}INFINITY'
   elif f32_bits == F32_SIGN_BIT:
     return '-0.f'
   else:
     s = '%.9g' % ReinterpretF32(f32_bits)
     if '.' not in s:
       s += '.'
-    return s + 'f'
+    return f'{s}f'
 
 
 def ReinterpretF64(f64_bits):
@@ -67,16 +67,16 @@ def ReinterpretF64(f64_bits):
 def F64ToC(f64_bits):
   F64_SIGN_BIT = 0x8000000000000000
   F64_INF = 0x7ff0000000000000
-  F64_SIG_MASK = 0xfffffffffffff
-
   if (f64_bits & F64_INF) == F64_INF:
     sign = '-' if (f64_bits & F64_SIGN_BIT) == F64_SIGN_BIT else ''
+    F64_SIG_MASK = 0xfffffffffffff
+
     # NaN or infinity
     if f64_bits & F64_SIG_MASK:
       # NaN
       return '%smake_nan_f64(0x%06x)' % (sign, f64_bits & F64_SIG_MASK)
     else:
-      return '%sINFINITY' % sign
+      return f'{sign}INFINITY'
   elif f64_bits == F64_SIGN_BIT:
     return '-0.0'
   else:
@@ -88,9 +88,7 @@ def MangleType(t):
 
 
 def MangleTypes(types):
-  if not types:
-    return 'v'
-  return ''.join(MangleType(t) for t in types)
+  return 'v' if not types else ''.join(MangleType(t) for t in types)
 
 
 def MangleName(s):
@@ -174,14 +172,12 @@ class CWriter(object):
     self.out_file.write('// %s:%d\n' % (self.source_filename, command['line']))
 
   def _WriteIncludes(self):
-    idx = 0
-    for filename in self.GetModuleFilenames():
-      header = os.path.splitext(filename)[0] + '.h'
+    for idx, filename in enumerate(self.GetModuleFilenames()):
+      header = f'{os.path.splitext(filename)[0]}.h'
       self.out_file.write(
           '#define WASM_RT_MODULE_PREFIX %s\n' % self.GetModulePrefix(idx))
       self.out_file.write("#include \"%s\"\n" % header)
       self.out_file.write('#undef WASM_RT_MODULE_PREFIX\n\n')
-      idx += 1
 
   def _WriteCommand(self, command):
     command_funcs = {
@@ -226,7 +222,7 @@ class CWriter(object):
     elif len(expected) == 0:
       self._WriteAssertActionCommand(command)
     else:
-      raise Error('Unexpected result with multiple values: %s' % expected)
+      raise Error(f'Unexpected result with multiple values: {expected}')
 
   def _WriteAssertReturnNanCommand(self, command):
     assert_map = {
@@ -255,14 +251,14 @@ class CWriter(object):
   def _Constant(self, const):
     type_ = const['type']
     value = int(const['value'])
-    if type_ == 'i32':
-      return '%su' % value
-    elif type_ == 'i64':
-      return '%sull' % value
-    elif type_ == 'f32':
+    if type_ == 'f32':
       return F32ToC(value)
     elif type_ == 'f64':
       return F64ToC(value)
+    elif type_ == 'i32':
+      return f'{value}u'
+    elif type_ == 'i64':
+      return f'{value}ull'
     else:
       assert False
 
@@ -278,7 +274,7 @@ class CWriter(object):
     elif type_ == 'get':
       return MangleType(result_types[0])
     else:
-      raise Error('Unexpected action type: %s' % type_)
+      raise Error(f'Unexpected action type: {type_}')
 
   def _Action(self, command):
     action = command['action']
@@ -287,12 +283,12 @@ class CWriter(object):
     mangled_module_name = self.GetModulePrefix(action.get('module'))
     field = (mangled_module_name + MangleName(action['field']) +
              MangleName(self._ActionSig(action, expected)))
-    if type_ == 'invoke':
-      return '%s(%s)' % (field, self._ConstantList(action.get('args', [])))
-    elif type_ == 'get':
-      return '*%s' % field
+    if type_ == 'get':
+      return f'*{field}'
+    elif type_ == 'invoke':
+      return f"{field}({self._ConstantList(action.get('args', []))})"
     else:
-      raise Error('Unexpected action type: %s' % type_)
+      raise Error(f'Unexpected action type: {type_}')
 
 
 def Compile(cc, c_filename, out_dir, *args):
@@ -375,18 +371,16 @@ def main(args):
     with open(main_filename, 'w') as out_main_file:
       out_main_file.write(output.getvalue())
 
-    o_filenames = []
-    includes = '-I%s' % options.wasmrt_dir
+    includes = f'-I{options.wasmrt_dir}'
 
     # Compile wasm-rt-impl.
     wasm_rt_impl_c = os.path.join(options.wasmrt_dir, 'wasm-rt-impl.c')
-    o_filenames.append(Compile(cc, wasm_rt_impl_c, out_dir, includes))
-
+    o_filenames = [Compile(cc, wasm_rt_impl_c, out_dir, includes)]
     for i, wasm_filename in enumerate(cwriter.GetModuleFilenames()):
       c_filename = utils.ChangeExt(wasm_filename, '.c')
       wasm2c.RunWithArgs(wasm_filename, '-o', c_filename, cwd=out_dir)
       if options.compile:
-        defines = '-DWASM_RT_MODULE_PREFIX=%s' % cwriter.GetModulePrefix(i)
+        defines = f'-DWASM_RT_MODULE_PREFIX={cwriter.GetModulePrefix(i)}'
         o_filenames.append(Compile(cc, c_filename, out_dir, includes, defines))
 
     if options.compile:

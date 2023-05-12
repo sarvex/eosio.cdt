@@ -57,7 +57,7 @@ def main(args):
                os.path.basename(options.file))
 
   with open(options.file) as f:
-    for line in f.readlines():
+    for line in f:
       if line.startswith('%%'):
         if section_name is not None:
           output.write(';\n\n');

@@ -59,9 +59,10 @@ def FindExeWithFallback(name, default_exe_list, override_exe=None):
     if os.path.exists(result):
       return os.path.abspath(result)
 
-  raise Error('%s executable not found.\n%s\n' %
-              (name, '\n'.join('search path: %s' % path
-                               for path in default_exe_list)))
+  raise Error(('%s executable not found.\n%s\n' % (
+      name,
+      '\n'.join(f'search path: {path}' for path in default_exe_list),
+  )))
 
 
 def FindExecutable(basename, override=None):

@@ -58,11 +58,7 @@ class TestRunner:
         return TestResult(t, None)
 
     def build_test_suite_map(self):
-        tst_suites_map = {}
-
-        for ts in self.test_suites:
-            tst_suites_map[ts.name] = ts
-
+        tst_suites_map = {ts.name: ts for ts in self.test_suites}
         self.test_suites_map = tst_suites_map
 
     def build_test_map(self):
